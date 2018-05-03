@@ -1,0 +1,319 @@
+Hive Configuration directory
+----------------------------------------------
+cd /etc/hive/conf
+hive-site.xml
+hive.metastore.warehouse.dir;
+----------------------------------------------
+
+create databae abhirajs25_retail_db_txt;
+use abhirajs25_retail_db_txt;
+show tables;
+
+hive (abhirajs25_retail_db_txt)> set hive.metastore.warehouse.dir;
+hive.metastore.warehouse.dir=/apps/hive/warehouse
+
+/apps/hive/warehouse - It is the HDFS directory location where actually hive databases are stored
+
+dfs -ls /apps/hive/warehouse/abhirajs25_retail_db_txt.db;
+describe formatted <table_name>
+
+create table orders(
+ order_id int,
+ order_date string,
+ order_customer_id int,
+ order_status string
+) row format delimited fields terminated by ','
+stored as textfile;
+
+load data local inpath '/data/retail_db/orders' into table orders;
+
+dfs -ls /apps/hive/warehouse/abhirajs25_retail_db_txt.db/orders;
+
+create table order_items(
+ order_item_id int,
+ order_item_order_id int,
+ order_item_product_id int,
+ order_item_quantity int,
+ order_item_subtotal float,
+ order_item_product_price float
+) row format delimited fields terminated by ','
+stored as textfile;
+
+
+load data local inpath '/data/retail_db/order_items' into table order_items;
+select * from order_items limit 10;
+
+----------------------------------------------------------------------------------------------
+//Cretae Hive Table - ORC file format
+// Other than text file format , ORC, AVRO etc file formats store the metadata for each record hence we need not to define row format delimited by
+
+create database abhirajs25_retail_db_orc;
+use abhirajs25_retail_db_orc;
+
+create table orders(
+ order_id int,
+ order_date string,
+ order_customer_id int,
+ order_status string
+) stored as orc;
+
+// Load the data stored as text format from another db table to orc format in current db tables
+insert into table orders select * from abhirajs25_retail_db_txt.orders;
+
+create table order_items(
+ order_item_id int,
+ order_item_order_id int,
+ order_item_product_id int,
+ order_item_quantity int,
+ order_item_subtotal float,
+ order_item_product_price float
+) stored as orc;
+
+// Load the data stored as text format from another db table to orc format in current db tables
+insert into table order_items select * from abhirajs25_retail_db_txt.order_items;
+
+---------------------------------------------------------------------------------------------
+//Executing Hive commands from spark shell 
+
+sqlContext.sql("use abhirajs25_retail_db_txt")
+sqlContext.sql("show tables").show()
+sqlContext.sql("select * from orders limit 10").show()
+
+---------------------------------------------------------------------------------------------
+//Functions in Hive
+
+show functions;
+
+create table customers(
+ customer_id int,
+ customer_fname varchar(45),
+ customer_lname varchar(45),
+ customer_email varchar(45),
+ customer_password varchar(45),
+ customer_street varchar(255),
+ customer_city varchar(45),
+ customer_state varchar(45),
+ customer_zipcode varchar(45)
+) row format delimited fields terminated by ','
+stored as textfile;
+
+load data local inpath '/data/retail_db/customers' into table customers;
+
+select substr('Hello World, How are you',7,5);
+select instr('Hello World, How are you','World');
+select "Hello World" like 'Hello%';
+select order_status,length(order_status) from orders limit 10;
+select lower('Hello World');
+select upper('Hello World');
+select trim(' Hello World ');
+select length(trim(' Hello World '));
+select lpad(13,3,'0')
+select cast("12" as int);
+select split("Hello World, How are you",' ');
+select index(split("Hello World, How are you",' '),4);
+
+----------------------------------------------------------------------------------
+//Manipulating Dates
+
+select current_timestamp;
+select date_format(current_date,'y');
+select date_format(current_date,'d');
+select day(current_date);
+select to_date(current_timestamp);
+select to_unix_timestamp(current_date);
+select to_unix_timestamp(current_timestamp);
+select from_unixtime(1524599419);
+select to_date(from_unixtime(1524599419));
+select date_add(order_date,10) from orders limit 10;
+
+-----------------------------------------------------------------------------------
+//Aggregate Functions
+
+select count(*) from orders;
+select sum(order_item_subtotal) from order_items;
+
+select order_status,
+             case order_status
+             when 'CLOSED' then 'No Action'
+             when 'COMPLETE' then 'No Action'
+             else 'Risky'
+             end from orders limit 10;
+
+
+select order_status,
+             case
+             when order_status IN ('CLOSED','COMPLETE') then 'No Action'
+             when order_status IN ('ON_HOLD','PAYMENT_REVIEW','PENDING','PROCESSING') then 'Pending Action'
+             else 'Risky'
+             end from orders limit 10;
+
+------------------------------------------------------------------------------------------------
+// Row level transformations
+
+select cast(concat(substr(order_date,1,4),substr(order_date,6,2)) as int) from orders limit 10;
+select cast(date_format(order_date,'YYYYMM') as int)from orders limit 10;
+
+-------------------------------------------------------------------------------------------------
+
+//Joins
+
+select o.*, c.* from orders o, customers c where o.order_customer_id = c.customer_id limit 10;
+
+select o.*, c.* from orders o join customers c 
+on o.order_csutomer_id = c.customer_id 
+limit 10;
+
+select o.*, c.* from orders o left outer join customers c 
+on o.order_customer_id = c.customer_id 
+limit 10;
+
+select count(*) from orders o join customers c 
+on o.order_customer_id = c.customer_id;
+
+select count(*) from customers c left outer join orders o 
+on o.order_customer_id = c.customer_id;
+
+//Customers who did not place any order, means data in the customer table but no records in the orders table
+
+select c.* from customers c left outer join orders o 
+on o.order_customer_id = c.customer_id
+where o.order_customer_id is null
+
+----------------------------------------------------------------------------------------------------
+
+//Aggregation
+
+// number of records for each order status
+select order_status, count(*) from orders group by order_status;
+
+// Revenue per order id
+
+select o.order_id, sum(oi.order_item_subtotal) order_revenue 
+from orders o join order_items oi 
+on o.order_id = oi.order_item_order_id
+group by o.order_id;
+
+// Revenue per Order Id for Complete and closed orders having revenue >= 1000
+
+select o.order_id,o.order_date,o.order_status, sum(oi.order_item_subtotal) order_revenue 
+from orders o join order_items oi 
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE','CLOSED')
+group by o.order_id,o.order_date,o.order_status
+having sum(oi.order_item_subtotal) >=1000;
+
+// Revenue per day for Complete and closed orders
+
+select o.order_date, sum(oi.order_item_subtotal) order_revenue 
+from orders o join order_items oi 
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE','CLOSED')
+group by o.order_date;
+
+// Revenue per day per status for Complete and closed orders
+
+select o.order_date,o.order_status, sum(oi.order_item_subtotal) order_revenue 
+from orders o join order_items oi 
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE','CLOSED')
+group by o.order_date,o.order_status;
+
+// Revenue per Order Id for Complete and closed orders having revenue >= 1000 sorted by date
+
+select o.order_id,o.order_date,o.order_status, round(sum(oi.order_item_subtotal),2) order_revenue 
+from orders o join order_items oi 
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE','CLOSED')
+group by o.order_id,o.order_date,o.order_status
+having sum(oi.order_item_subtotal) >=1000
+order by o.order_date, order_revenue desc;
+
+
+
+select o.order_id,o.order_date,o.order_status, round(sum(oi.order_item_subtotal),2) order_revenue 
+from orders o join order_items oi 
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE','CLOSED')
+group by o.order_id,o.order_date,o.order_status
+having sum(oi.order_item_subtotal) >=1000
+distribute by o.order_date sort by o.order_date, order_revenue desc;
+
+------------------------------------------------------------------------------------------------------
+
+//Analytics functions - Aggregate
+//Calculate the total revenue for each order along with the percentage of revenue for each item in that order
+
+select * from (
+select o.order_id,o.order_date,o.order_status, oi.order_item_subtotal,
+round(sum(oi.order_item_subtotal) over(partition by o.order_id),2) order_revenue,
+oi.order_item_subtotal/round(sum(oi.order_item_subtotal) over(partition by o.order_id),2) pct_revenue 
+from orders o join order_items oi 
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE','CLOSED')) q
+where order_revenue >= 1000
+order by order_date, order_revenue desc;
+
+//Ranking
+//Rank - In case of conflict of i.e. same values of the column on which ranking needs to be done , it assigns same value to it and skips the next rank.
+//Dense Rank - In case of conflict i.e. same values of the column on which ranking needs to be done , it assigns same value to it and keep on incrementing rank.
+//Percent Rank - Calculates percent rank
+//Row number with order by - In case of conflict, it assign random rank
+//Row number without order by - random ranking
+
+select * from (
+select o.order_id,o.order_date,o.order_status, oi.order_item_subtotal,
+round(sum(oi.order_item_subtotal) over(partition by o.order_id),2) order_revenue,
+oi.order_item_subtotal/round(sum(oi.order_item_subtotal) over(partition by o.order_id),2) pct_revenue,
+round(avg(oi.order_item_subtotal) over(partition by o.order_id),2) avg_revenue,
+rank() over (partition by o.order_id order by oi.order_item_subtotal desc) rnk_revenue,
+dense_rank() over (partition by o.order_id order by oi.order_item_subtotal desc) dense_rnk_revenue,
+percent_rank() over (partition by o.order_id order by oi.order_item_subtotal desc) pct_rnk_revenue,
+row_number() over (partition by o.order_id order by oi.order_item_subtotal desc) rn_orderby_revenue,
+row_number() over (partition by o.order_id) rn_revenue
+from orders o join order_items oi 
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE','CLOSED')) q
+where order_revenue >= 1000
+order by order_date, order_revenue desc,rnk_revenue;
+
+Output ::::
+
+67410   2014-07-24 00:00:00.0   COMPLETE        399.98  1019.94 0.39216033392780764     203.99  1       1       0.0     1       2
+67410   2014-07-24 00:00:00.0   COMPLETE        199.99  1019.94 0.19608016696390382     203.99  2       2       0.25    3       1
+67410   2014-07-24 00:00:00.0   COMPLETE        199.99  1019.94 0.19608016696390382     203.99  2       2       0.25    2       4
+67410   2014-07-24 00:00:00.0   COMPLETE        159.99  1019.94 0.15686217374861663     203.99  4       3       0.75    4       5
+67410   2014-07-24 00:00:00.0   COMPLETE        59.99   1019.94 0.05881718697027942     203.99  5       4       1.0     5       3
+
+//Windowing function
+//lead - Gives the next value based on the logic for given column
+//lag - Gives the previous value based on the logic for given column
+//first_value - Gives the first value based on the logic for given column
+
+select * from (
+select o.order_id,o.order_date,o.order_status, oi.order_item_subtotal,
+round(sum(oi.order_item_subtotal) over(partition by o.order_id),2) order_revenue,
+oi.order_item_subtotal/round(sum(oi.order_item_subtotal) over(partition by o.order_id),2) pct_revenue,
+round(avg(oi.order_item_subtotal) over(partition by o.order_id),2) avg_revenue,
+rank() over (partition by o.order_id order by oi.order_item_subtotal desc) rnk_revenue,
+dense_rank() over (partition by o.order_id order by oi.order_item_subtotal desc) dense_rnk_revenue,
+percent_rank() over (partition by o.order_id order by oi.order_item_subtotal desc) pct_rnk_revenue,
+row_number() over (partition by o.order_id order by oi.order_item_subtotal desc) rn_orderby_revenue,
+row_number() over (partition by o.order_id) rn_revenue,
+lead(oi.order_item_subtotal) over (partition by o.order_id order by oi.order_item_subtotal desc) lead_order_item_subtotal,
+lag(oi.order_item_subtotal) over (partition by o.order_id order by oi.order_item_subtotal desc) lag_order_item_subtotal,
+first_value(oi.order_item_subtotal) over (partition by o.order_id order by oi.order_item_subtotal desc) first_order_item_subtotal
+from orders o join order_items oi 
+on o.order_id = oi.order_item_order_id
+where o.order_status in ('COMPLETE','CLOSED')) q
+where order_revenue >= 1000
+order by order_date, order_revenue desc,rnk_revenue;
+
+output ::::
+
+67410   2014-07-24 00:00:00.0   COMPLETE        399.98  1019.94 0.39216033392780764     203.99  1       1       0.0     1       2       199.99  NULL    399.98
+67410   2014-07-24 00:00:00.0   COMPLETE        199.99  1019.94 0.19608016696390382     203.99  2       2       0.25    3       1       159.99  199.99  399.98
+67410   2014-07-24 00:00:00.0   COMPLETE        199.99  1019.94 0.19608016696390382     203.99  2       2       0.25    2       4       199.99  399.98  399.98
+67410   2014-07-24 00:00:00.0   COMPLETE        159.99  1019.94 0.15686217374861663     203.99  4       3       0.75    4       5       59.99   199.99  399.98
+67410   2014-07-24 00:00:00.0   COMPLETE        59.99   1019.94 0.05881718697027942     203.99  5       4       1.0     5       3       NULL    159.99  399.98
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+

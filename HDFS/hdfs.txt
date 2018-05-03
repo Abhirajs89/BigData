@@ -1,0 +1,35 @@
+Properties files
+--------------------------------
+/etc/hadoop/conf/core-site.xml
+/etc/hadoop/conf/hdfs-site.xml
+
+Important Properties
+--------------------------------
+fs.defaultFS
+dfs.blocksize
+dfs.replication
+
+Hadoop Commands
+--------------------------------
+hadoop fs -ls /user/abhirajs25 - list directory
+
+hadoop fs -copyFromLocal /data/crime /user/abhirajs25/.  - copy from local to hadoop file system
+
+hadoop fs -get /user/abhirajs25/sqoop_import/retail_db/order_items order_items  - copy from hadoop file system to local 
+
+hadoop fs -du -s -h /user/abhirajs25/crime  - get the size of the crime folder in human readable format. 
+                                            -s to summarize all the files in the crime folder
+											-h to get the size in human readable format
+
+hadoop fsck /user/abhirajs25/crime -files -blocks -locations  - to see how files are stored on hdfs
+
+hadoop fs -rm -R /user/abhirajs25/sqoop_import/retail_db/* - delete data
+
+hadoop fs -tail /user/abhirajs25/sqoop_import/retail_db/order_items/part-m-00000 - see the tail data from file
+
+hadoop fs -cat /user/abhirajs25/sqoop_import/retail_db/order_with_revenue/part-m-00000 | head - see the top records from file
+
+
+Linux commands
+----------------------------------------------
+gunzip part*.gz - unzip gz files

@@ -1,0 +1,458 @@
+#map()
+ 
+//Get the date in YYYYMMDD format
+orders = sc.textFile("/public/retail_db/orders")
+orders.map(lambda o:int(o.split(",")[1].split(" ")[0].replace("-",""))).take(10)
+
+//Get the order Id and subtotal in Key and value format
+orderItems = sc.textFile("/public/retail_db/order_items")
+orderMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),float(oi.split(",")[4])))
+
+--------------------------------------------------------------------------
+
+//If lambda function uses return the array of values use flatMap instead of Map
+#flatMap
+
+linesList = ["How are you","let us perform","word count using flatMap","to understand flatMap in detail"]
+lines = sc.parallelize(linesList)
+words = lines.flatMap(lambda l:l.split(" "))
+for i in words.collect(): print(i)
+
+---------------------------------------------------------------------------
+
+//Filtering on the data can be done vertically or horizontally
+//Horizontal filtering means creating the subset of data based on condition
+//filter will return the records which satisfies the given boolean condition
+// e.g filter the records whose status is either COMPLETE or CLOSED of the month January 2014
+
+#filter
+orders = sc.textFile("/public/retail_db/orders")
+ordersComplete = orders. \
+filter(lambda o: o.split(",")[3] in ["COMPLETE","CLOSED"] and o.split(",")[1][:7] == "2014-01")
+for i in ordersComplete.take(10): print(i)
+
+----------------------------------------------------------------------------
+
+// Join requires datasets of type (K,V) and (K,W) and returns a dataset of type (K,(V,W)) pairs with all pairs of elements for each key
+
+#Inner join
+
+orders = sc.textFile("/public/retail_db/orders")
+orderItems = sc.textFile("/public/retail_db/order_items")
+
+orderMap = orders.map(lambda o: (int(o.split(",")[0]),o.split(",")[1]))
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),float(oi.split(",")[4])))
+
+orderJoin = orderMap.join(orderItemsMap)
+
+------------------------------------------------------------------------------
+
+//Thumb rule in outer join is if there are two tables parent and child with relationship then in case of LeftouterJoin keep parent on left side
+//Similaraly in case of RightOuterjoin keep parent table on right side
+
+-------------------------------------------------------------------------------
+
+//Get all the orders id with no order Items
+#Left Outer Join
+
+orders = sc.textFile("/public/retail_db/orders")
+orderItems = sc.textFile("/public/retail_db/order_items")
+
+for i in orders.take(10): print(i)
+
+for i in orderItems.take(10): print(i)
+
+orderMap = orders.map(lambda o: (int(o.split(",")[0]),o.split(",")[3]))
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),float(oi.split(",")[4])))
+
+for i in orderMap.take(100): print(i)
+
+for i in orderItemsMap.take(100): print(i)
+
+ordersLeftOuterJoin = orderMap.leftOuterJoin(orderItemsMap)
+for i in ordersLeftOuterJoin.take(100): print(i)
+
+orderLeftOuterJoinFilter = ordersLeftOuterJoin.filter(lambda o: o[1][1]==None)
+
+for i in orderLeftOuterJoinFilter.take(10): print(i)
+
+orderLeftOuterJoinFilter.count()
+
+----------------------------------------------------------------------------------
+
+// In right outer Join parent table will be on right side, end result will be same
+#Right Outer Join
+
+orders = sc.textFile("/public/retail_db/orders")
+orderItems = sc.textFile("/public/retail_db/order_items")
+
+for i in orders.take(10): print(i)
+
+for i in orderItems.take(10): print(i)
+
+orderMap = orders.map(lambda o: (int(o.split(",")[0]),o.split(",")[3]))
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),float(oi.split(",")[4])))
+
+for i in orderMap.take(100): print(i)
+
+for i in orderItemsMap.take(100): print(i)
+
+ordersRightOuterJoin = orderItemsMap.rightOuterJoin(orderMap)
+for i in ordersLeftOuterJoin.take(100): print(i)
+
+orderRightOuterJoinFilter = ordersRightOuterJoin.filter(lambda o: o[1][0]==None)
+
+for i in orderRightOuterJoinFilter.take(10): print(i)
+
+orderRightOuterJoinFilter.count()
+
+// Full outer join is the join nothing but a.leftOuterJoin(b) union a.rightOurtJoin(b)
+// In case of Full outer join it will return None if there is no corresponding value present based on the condition
+
+----------------------------------------------------------------------------------
+
+//Aggregation - Total - count()
+
+orderItems = sc.textFile("/public/retail_db/order_items")
+orderItems.count()
+
+-----------------------------------------------------------------------------------
+//Aggregation - Total - reduce() - Get the revenue for given order id
+
+orderItems = sc.textFile("/public/retail_db/order_items")
+for i in orderItems.take(10): print(i)
+
+orderItemFilter = orderItems.filter(lambda oi:int(oi.split(",")[1])==2)
+for i in orderItemFilter.take(10): print(i)
+
+orderItemMap = orderItemFilter.map(lambda oi: float(oi.split(",")[4]))
+for i in orderItemMap.take(10): print(i)
+
+from operator import add
+orderItemMap.reduce(add)
+
+orderItemMap.reduce(lambda x,y:x+y)
+
+-------------------------------------------------------------------------------------
+
+//Aggregation - countByKey() - Get order item details which have minimum order_item_subtotal for given order_id
+//countByKey() returns output of type Dictionary of Python and hence further spark API can not be performed
+
+orderItems = sc.textFile("/public/retail_db/order_items")
+for i in orderItems.take(10): print(i)
+
+orderItemFilter = orderItems.filter(lambda oi:int(oi.split(",")[1])==2)
+for i in orderItemFilter.take(10): print(i)
+
+orderItemFilter. \
+  reduce(lambda x,y:
+         x if(float(x.split(",")[4])<float(y.split(",")[4])) else y
+        )
+
+--------------------------------------------------------------------------------------
+//Aggregation - countByKey - Get count by status
+
+orders = sc.textFile("/public/retail_db/orders")
+for i in orders.take(10): print(i)
+
+odersMap = orders.map(lambda o: (o.split(",")[3],1))
+for i in odersMap.take(10): print(i)
+
+odersCountBystatus = odersMap.countByKey()
+
+---------------------------------------------------------------------------------------
+
+//Aggregation - groupBykey - Get revenue for each order_id
+
+orderItems = sc.textFile("/public/retail_db/order_items")
+for i in orderItems.take(10): print(i)
+
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),float(oi.split(",")[4])))
+for i in orderItemsMap.take(10): print(i)
+
+orderItemsGroupByOrderId = orderItemsMap.groupByKey()
+for i in orderItemsGroupByOrderId.take(10): print(i)
+
+
+revenuePerOrderId = orderItemsGroupByOrderId.map(lambda oi:(int(oi[0]),round(sum(oi[1]),2)))
+for i in revenuePerOrderId.take(10): print(i)
+
+---------------------------------------------------------------------------------------
+//Sorting Data using groupByKey
+//Aggregation - groupBykey - Get order item details in descending order by revenue for each order id
+
+orderItems = sc.textFile("/public/retail_db/order_items")
+for i in orderItems.take(10): print(i)
+
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),oi))
+for i in orderItemsMap.take(10): print(i)
+
+orderItemsGroupByOrderId = orderItemsMap.groupByKey()
+for i in orderItemsGroupByOrderId.take(10): print(i)
+
+//Here below lambda function returns the array of values use flatMap instead of Map
+
+orderItemsSortedBySubtotalPerOrder = orderItemsGroupByOrderId. \
+flatMap(lambda oi:
+		sorted(oi[1],key = lambda k: float(k.split(",")[4]),reverse=True)
+		)
+for i in orderItemsSortedBySubtotalPerOrder.take(10): print(i)
+
+----------------------------------------------------------------------------------------
+//Aggregation - reduceBykey - Get revenue for each order_id
+//reduceByKey will do the groupByKey operation internally so we can directly perform the aggregation such as add, minimum etc.
+orderItems = sc.textFile("/public/retail_db/order_items")
+for i in orderItems.take(10): print(i)
+
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),float(oi.split(",")[4])))
+for i in orderItemsMap.take(10): print(i)
+
+from operator import add
+revenuePerOrderId = orderItemsMap.reduceByKey(add)
+for i in revenuePerOrderId.take(10): print(i)
+
+revenuePerOrderId = orderItemsMap.reduceByKey(lambda x,y:x+y)
+for i in revenuePerOrderId.take(10): print(i)
+
+//Minimum subtotal per order ID
+minSubtotalPerOrderId = orderItemsMap.reduceByKey(lambda x,y:x if (x<y) else y)
+for i in minSubtotalPerOrderId.take(10): print(i)
+
+----------------------------------------------------------------------------------------
+
+//Aggregation - reduceBykey - Get order item details with minimum subtotal for each order_id
+//reduceByKey will do the groupByKey operation internally so we can directly perform the aggregation such as add, minimum etc.
+
+orderItems = sc.textFile("/public/retail_db/order_items")
+for i in orderItems.take(10): print(i)
+
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),oi))
+for i in orderItemsMap.take(10): print(i)
+
+revenuePerOrderId = orderItemsMap.reduceByKey(lambda x,y: x if (float(x.split(",")[4])<float(y.split(",")[4])) else y)
+for i in revenuePerOrderId.take(10): print(i)
+
+---------------------------------------------------------------------------------------
+
+//Aggregation - aggregateByKey - Get revenue and count of items for each order id
+//If combiner logic and reducer logic is different then we have to use aggregateByKey
+
+orderItems = sc.textFile("/public/retail_db/order_items")
+for i in orderItems.take(10): print(i)
+
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),float(oi.split(",")[4])))
+for i in orderItemsMap.take(10): print(i)
+
+//(2, 199.99)
+//(2, 250.0)
+//(2, 129.99)
+
+//First argument is based on the type of the expected output tuple
+//Here output will be of format (2,(579.98,3)) where 2 is order Id, 579.98 is revenue for order 2 and 3 is the total items in order 2
+
+//(2,(449.99,2))
+//(2,(129.99,1))
+
+revenuePerOrder =  orderItemsMap. \
+aggregateByKey((0.0,0),
+  lambda x,y:(x[0]+y,x[1]+1),
+  lambda x,y:(x[0]+y[0],x[1]+y[1]))
+
+for i in revenuePerOrder.take(10): print(i)
+
+----------------------------------------------------------------------------------------
+
+//Sort Data by product price - sortByKey
+//sortByKey takes (K,V) and sorts the data based on the key - here key is product price
+
+products = sc.textFile("/public/retail_db/products")
+for i in products.take(10): print(i)
+
+productsMap = products. \
+filter(lambda p: p.split(",")[4] != ""). \
+map(lambda p: (float(p.split(",")[4]),p))
+
+productsSortedByPrice = productsMap.sortByKey()
+
+productsSortedMap = productsSortedByPrice.map(lambda p:p[1])
+
+for i in productsSortedMap.take(10): print(i)
+
+-----------------------------------------------------------------------------------------
+
+//Sort the data by product category and then product price descending - sortByKey
+
+products = sc.textFile("/public/retail_db/products")
+for i in products.take(10): print(i)
+
+productsMap = products. \
+filter(lambda p: p.split(",")[4] != ""). \
+map(lambda p: ((int(p.split(",")[1]),-float(p.split(",")[4])),p))
+
+for i in productsMap.take(10): print(i)
+
+productsSortedByIdPrice = productsMap.sortByKey()
+
+for i in productsSortedByIdPrice.take(10): print(i)
+
+productsSortedMap = productsSortedByIdPrice.map(lambda p: p[1])
+for i in productsSortedMap.take(10): print(i)
+
+------------------------------------------------------------------------------------------
+
+//Get Top N products by price - Global Ranking - sortByKey and take
+
+products = sc.textFile("/public/retail_db/products")
+for i in products.take(10): print(i)
+
+productsMap = products. \
+filter(lambda p: p.split(",")[4] != ""). \
+map(lambda p: (float(p.split(",")[4]),p))
+
+productsSortedByPrice = productsMap.sortByKey(False)
+
+for i in productsSortedByPrice. \
+map(lambda p:p[1]). \
+take(5): print(i)
+
+-------------------------------------------------------------------------------------------
+
+//Get Top N products by price - Global Ranking - top and takeOrdered
+
+products = sc.textFile("/public/retail_db/products")
+for i in products.take(10): print(i)
+
+productsMap = products. \
+filter(lambda p: p.split(",")[4] != "")
+
+topNProducts = productsMap.top(5,key=lambda k:float(k.split(",")[4]))
+for i in topNProducts: print(i)
+
+topNProducts = productsMap.takeOrdered(5,key=lambda k:-float(k.split(",")[4]))
+for i in topNProducts: print(i)
+
+-----------------------------------------------------------------------------------------
+
+//Set operation prepare data- It required both the datasets to be identical - subset of products for 2013-12 and 2014-01
+
+orders = sc.textFile("/public/retail_db/orders")
+orderItems = sc.textFile("/public/retail_db/order_items")
+
+orders201312 = orders. \
+filter(lambda o:o.split(",")[1][:7]=="2013-12"). \
+map(lambda o:(int(o.split(",")[0]),o))
+
+orders201401 = orders. \
+filter(lambda o:o.split(",")[1][:7]=="2014-01"). \
+map(lambda o:(int(o.split(",")[0]),o))
+
+for i in orders201312.take(10): print(i)
+for i in orders201401.take(10): print(i)
+
+orderItemsMap = orderItems. \
+map(lambda oi: (int(oi.split(",")[1]),oi))
+
+for i in orderItemsMap.take(10): print(i)
+
+orders201312join = orders201312.join(orderItemsMap)
+orders201401join = orders201401.join(orderItemsMap)
+
+orderItems201312 = orders201312.join(orderItemsMap). \
+join(orderItemsMap). \
+map(lambda oi:oi[1][1])
+
+orderItems201401 = orders201401.join(orderItemsMap). \
+join(orderItemsMap). \
+map(lambda oi:oi[1][1])
+
+for i in orderItems201312.take(10): print(i)
+for i in orderItems201401.take(10): print(i)
+
+---------------------------------------------------------------------------------------
+
+//Set Union - Get product id's sold in 2013-12 and 2014-01
+
+products2013 = orderItems201312. \
+map(lambda p: int(p.split(",")[2]))
+
+products2014 = orderItems201401. \
+map(lambda p: int(p.split(",")[2]))
+
+for i in products2013.take(10): print(i)
+for i in products2014.take(10): print(i)
+
+allProducts = products2013.union(products2014).distinct()
+allProducts.count()
+
+for i in allProducts.collect() :print(i)
+
+----------------------------------------------------------------------------------------
+
+//Set operation - intersection - Get product id's sold in both 2013-12 and 2014-01
+
+commonProducts = products2013.intersection(products2014)
+commonProducts.count()
+
+----------------------------------------------------------------------------------------
+
+//Set operation - substract - Get product id's sold in 2013-12 but not in 2014-01
+
+products201312only = products2013.subtract(products2014).distinct()
+for i in products201312only.collect() :print(i)
+
+-----------------------------------------------------------------------------------------
+
+// saveAstextFile - Saving processed data in HDFS in Text file format
+// While saving data, path to save should not have any data otherwise it will fail to save
+
+orderItems = sc.textFile("/public/retail_db/order_items")
+for i in orderItems.take(10): print(i)
+
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),float(oi.split(",")[4])))
+for i in orderItemsMap.take(10): print(i)
+
+from operator import add
+revenuePerOrderId = orderItemsMap.reduceByKey(add).\
+map(lambda r: str(r[0]) +"\t"+ str(r[1]))
+for i in revenuePerOrderId.take(10): print(i)
+
+revenuePerOrderId.saveAsTextFile("/user/abhirajs25/revenue_per_order_id")
+for i in sc.textFile("/user/abhirajs25/revenue_per_order_id").take(100): print(i)
+
+-----------------------------------------------------------------------------------------
+
+//compress data while Saving into HDFS
+
+orderItems = sc.textFile("/public/retail_db/order_items")
+for i in orderItems.take(10): print(i)
+
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),float(oi.split(",")[4])))
+for i in orderItemsMap.take(10): print(i)
+
+from operator import add
+revenuePerOrderId = orderItemsMap.reduceByKey(add).\
+map(lambda r: str(r[0]) +"\t"+ str(r[1]))
+for i in revenuePerOrderId.take(10): print(i)
+
+revenuePerOrderId.saveAsTextFile("/user/abhirajs25/revenue_per_order_id_compressed",compressionCodecClass="org.apache.hadoop.io.compress.SnappyCodec")
+for i in sc.textFile("/user/abhirajs25/revenue_per_order_id_compressed").take(100): print(i)
+
+------------------------------------------------------------------------------------------
+
+// Saving Data in different file formats
+// Convert data into DataFrame first to save in different file formats such as json,avro, parquet
+
+orderItems = sc.textFile("/public/retail_db/order_items")
+for i in orderItems.take(10): print(i)
+
+orderItemsMap = orderItems.map(lambda oi:(int(oi.split(",")[1]),float(oi.split(",")[4])))
+for i in orderItemsMap.take(10): print(i)
+
+from operator import add
+revenuePerOrderId = orderItemsMap.reduceByKey(add)
+
+revenuePerOrderIdDF = revenuePerOrderId.toDF(schema=["order_id","order_revenue"])
+revenuePerOrderIdDF.save("/user/abhirajs25/revenue_per_order_id_json","json")
+revenuePerOrderIdDF.write.json("/user/abhirajs25/revenue_per_order_id_json")
+
+sqlContext.read.json("/user/abhirajs25/revenue_per_order_id_json").show()

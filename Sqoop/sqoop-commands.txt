@@ -1,0 +1,393 @@
+Sqoop User Guid 1.4.6
+------------------------------------------------------
+sqoop version
+sqoop help eval
+
+Mysql Connector location - cd /usr/hdp/current/sqoop-client/lib/
+-------------------------------------------------------
+
+sqoop list-databases \
+  --connect jdbc:mysql://ms.itversity.com:3306 \
+  --username retail_user \
+  --password itversity
+
+sqoop list-tables \
+ --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity
+
+sqoop eval \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --query "select * from orders limit 10"
+
+sqoop eval \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --query "describe order_items"
+
+sqoop eval \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_export \
+  --username retail_user \
+  --password itversity \
+  --query "Create Table dummy (i INT)"
+
+sqoop eval \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --query "select * from order_items limit 10"
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items \
+  --warehouse-dir /user/abhirajs25/sqoop_import/retail_db
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items \
+  --warehouse-dir /user/abhirajs25/sqoop_import/retail_db \
+  --num-mappers 1
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items \
+  --warehouse-dir /user/abhirajs25/sqoop_import/retail_db \
+  --num-mappers 1 \
+  --delete-target-dir
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items \
+  --warehouse-dir /user/abhirajs25/sqoop_import/retail_db \
+  --num-mappers 1 \
+  --append
+
+//split by custom column non-indexed field
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items_nopk \
+  --warehouse-dir /user/abhirajs25/sqoop_import/retail_db \
+  --split-by order_item_order_id
+
+//Split by non-numeric field while import
+
+sqoop import \
+  -Dorg.apache.sqoop.splitter.allow_text_splitter=true \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table orders \
+  --warehouse-dir /user/abhirajs25/sqoop_import/retail_db \
+  --split-by order_status
+
+//Auto reset to one mapper
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items_nopk \
+  --warehouse-dir /user/abhirajs25/sqoop_import/retail_db \
+  --autoreset-to-one-mapper
+
+// import as sequence file format
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items \
+  --warehouse-dir /user/abhirajs25/sqoop_import/retail_db \
+  --num-mappers 2 \
+  --as-sequencefile
+
+// compress and import (gzip)
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items \
+  --warehouse-dir /user/abhirajs25/sqoop_import/retail_db \
+  --compress
+
+
+//Snappy compress and import
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items \
+  --warehouse-dir /user/abhirajs25/sqoop_import/retail_db \
+  --compress \
+  --compression-codec org.apache.hadoop.io.compress.SnappyCodec
+
+//Boundary query to import records where order_item_id>99999
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items \
+  --warehouse-dir /user/abhirajs25/sqoop_import/retail_db \
+  --boundary-query 'select min(order_item_id) , max(order_item_id) from order_items where order_item_id>99999'
+
+//Boudary query with hard coded min, max values
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items \
+  --warehouse-dir /user/abhirajs25/sqoop_import/retail_db \
+  --boundary-query 'select 100000,172198'
+
+//Table and/or column is mutually exclusive with query
+//import data of selected columns only
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items \
+  --columns order_item_order_id,order_item_id,order_item_subtotal \
+  --warehouse-dir /user/abhirajs25/sqoop_import/retail_db
+
+//For query split-by is mandatory if num-mappers is greater than 1
+//Query should have a placeholder \$CONDITIONS
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --target-dir /user/abhirajs25/sqoop_import/retail_db/order_with_revenue \
+  --query "select o.*, sum(oi.order_item_subtotal) order_revenue from orders o join order_items oi on o.order_id = oi.order_item_order_id and \$CONDITIONS group by o.order_id,o.order_date,o.order_customer_id,o.order_status" \
+  --split-by order_id
+
+//Format data while import
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com/hr_db \
+  --username hr_user \
+  --password itversity \
+  --table employees \
+  --warehouse-dir /user/abhirajs25/sqoop_import/hr_db \
+  --null-non-string -1 \
+  --fields-terminated-by "\t" \
+  --lines-terminated-by ":"
+
+//ASCII character as fields terminated
+//Format data while import
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com/hr_db \
+  --username hr_user \
+  --password itversity \
+  --table employees \
+  --warehouse-dir /user/abhirajs25/sqoop_import/hr_db \
+  --null-non-string -1 \
+  --fields-terminated-by "\000" \
+  --lines-terminated-by ":" \
+  --num-mappers 1 
+
+//Incremental import using query
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --target-dir /user/abhirajs25/sqoop_import/retail_db/orders \
+  --query "select * from orders where \$CONDITIONS and order_date like '2013-%'" \
+  --split-by order_id \
+  --append
+
+//Incremental import using table and where
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table orders \
+  --where "order_date like '2014-02%'" \
+  --target-dir /user/abhirajs25/sqoop_import/retail_db/orders \
+  --append
+
+//Incremental import using table and check-column
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --target-dir /user/abhirajs25/sqoop_import/retail_db/orders \
+  --num-mappers 2 \
+  --table orders \
+  --check-column order_date \
+  --incremental append \
+  --last-value '2014-02-28'
+
+//Import into Hive
+//By default data will get appended into the hive table if table already exists which is being imported
+//Sqoop first will import into local directory and then run hive query to load data into hive table
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items \
+  --hive-import \
+  --hive-database abhirajs25_sqoop_import \
+  --hive-table order_items \
+  --num-mappers 2
+
+//Hive create complete snapshot and not append to existing location using overwrite
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items \
+  --hive-import \
+  --hive-database abhirajs25_sqoop_import \
+  --hive-table order_items \
+  --hive-overwrite \
+  --num-mappers 2
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table orders \
+  --hive-import \
+  --hive-database abhirajs25_sqoop_import \
+  --hive-table orders \
+  --hive-overwrite \
+  --num-mappers 2
+
+//Fail the import into hive if the table already exists
+
+sqoop import \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --table order_items \
+  --hive-import \
+  --hive-database abhirajs25_sqoop_import \
+  --hive-table order_items \
+  --create-hive-table \
+  --num-mappers 2
+
+// Import all tables into hdfs
+
+sqoop import-all-tables \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_db \
+  --username retail_user \
+  --password itversity \
+  --warehouse-dir /user/abhirajs25/sqoop_import/retail_db \
+  --autoreset-to-one-mapper
+
+
+// Create hive table to be exported to mysql 
+
+create table daily_revenue as
+select order_date, sum(order_item_subtotal) daily_revenue
+from orders join order_items on
+order_id=order_item_order_id
+where order_date like '2013-07%'
+group by order_date;
+
+// create table in mysql before exporting data to it as below
+create table daily_revenue_abhirajs25 (
+order_date varchar (30),
+revenue float
+);
+
+// Export from hive table (daily_revenue) to mysql table (daily_revenue_abhirajs25) using sqoop
+// ASCII for ^A is "\001" as data in hive is seperated by ^A , we need to use it while exporting
+
+sqoop export \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_export \
+  --username retail_user \
+  --password itversity \
+  --export-dir /apps/hive/warehouse/abhirajs25_sqoop_import.db/daily_revenue \
+  --table daily_revenue_abhirajs25 \
+  --input-fields-terminated-by "\001"
+
+
+// create table in mysql before exporting data to it as below
+create table daily_revenue_abhirajs25_demo (
+revenue float,
+order_date varchar (30),
+description varchar (200)
+);
+
+// Export from Hive table to Mysql table using sqoop columns clause to copy specific columns
+// columns should be given as per the source table structure i.e. hive table structure (daily_revenue in this case)
+sqoop export \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_export \
+  --username retail_user \
+  --password itversity \
+  --export-dir /apps/hive/warehouse/abhirajs25_sqoop_import.db/daily_revenue \
+  --table daily_revenue_abhirajs25_demo \
+  --columns order_date,revenue \
+  --input-fields-terminated-by "\001" \
+  --num-mappers 1
+
+// create table in mysql with primary key before exporting data to it as below
+
+create table daily_revenue_abhirajs25 (
+order_date varchar (30) primary key,
+revenue float
+);
+
+//update records for given update-key if record already exists
+sqoop export \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_export \
+  --username retail_user \
+  --password itversity \
+  --export-dir /apps/hive/warehouse/abhirajs25_sqoop_import.db/daily_revenue \
+  --table daily_revenue_abhirajs25 \
+  --update-key order_date \
+  --input-fields-terminated-by "\001"
+
+//Load everyday revenue into hive table
+
+create table daily_revenue as
+select order_date, sum(order_item_subtotal) daily_revenue
+from orders join order_items on
+order_id=order_item_order_id
+group by order_date;
+
+//Create Stage table to avoid inconsistent export in case of any cnstraint violation
+
+create table daily_revenue_abhirajs25_stage (
+order_date varchar (30) primary key,
+revenue float
+);
+
+// Export data to staging table before actually copying to original table
+// Data from hive table will be first copied from hive table to stage table as stage table will be empty there should not be any issue while copying
+// Once Export to stage table is complete date will be copied from stage table to actual table in one shot and will throw error if any constraint violated
+// and will maintain the state of the table by not coying single record
+// If export is successfull from stage to actual table then stage table will be cleared
+
+sqoop export \
+  --connect jdbc:mysql://ms.itversity.com:3306/retail_export \
+  --username retail_user \
+  --password itversity \
+  --export-dir /apps/hive/warehouse/abhirajs25_sqoop_import.db/daily_revenue \
+  --table daily_revenue_abhirajs25 \
+  --staging-table daily_revenue_abhirajs25_stage \
+  --clear-staging-table \
+  --input-fields-terminated-by "\001"
